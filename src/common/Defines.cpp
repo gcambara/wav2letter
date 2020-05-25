@@ -112,6 +112,27 @@ DEFINE_int64(
     10,
     "Stride millisecond for power spectrum feature");
 
+// PITCH OPTIONS
+DEFINE_bool(pitch, false, "append pitch features (pitch, POV and delta pitch) to the main features");
+DEFINE_int64(pitchframesizems, 500, "pitch frame size in milliseconds");
+DEFINE_int64(pitchframestridems, 10, "pitch frame stride in milliseconds");
+DEFINE_double(lowpasscutoff, 1000, "low pass filter cutoff in Hertz");
+DEFINE_int64(lowpassfilterwidth, 2, "low pass filter width");
+DEFINE_double(minF0, 50, "minimum possible frequency value in Hertz");
+DEFINE_double(maxF0, 400, "maximum possible frequency value in Hertz");
+DEFINE_double(softMinF0, 10, "minimum f0, applied in soft way, must not exceed min-f0");
+DEFINE_double(nccfBallast, 0.625, "increasing this factor reduces NCCF for quiet frames");
+DEFINE_double(penaltyFactor, 0.1, "factor that penalizes frequency change");
+DEFINE_double(deltaPitch, 0.005, "smallest relative change in pitch measured by the algorithm");
+DEFINE_double(resampleFrequency, 4000, "sample frequency for NCCF, must exceed twice lowpass-cutoff");
+DEFINE_int64(upsampleFilterWidth, 5, "integer that determines filter width when upsampling NCCF");
+DEFINE_bool(jitterabsolute, false, "append jitter absolute feature to pitch features");
+DEFINE_bool(jitterrelative, false, "append jitter relative feature to pitch features");
+DEFINE_bool(shimmerdb, false, "append shimmer DB feature to pitch features");
+DEFINE_bool(shimmerrelative, false, "append shimmer relative feature to pitch features");
+DEFINE_bool(shimmerapq3, false, "append shimmer apq3 feature to pitch features");
+DEFINE_int64(voicequalityaveragems, 500, "time in milliseconds to average voice quality parameters");
+
 // RUN OPTIONS
 DEFINE_string(datadir, "", "speech data directory");
 DEFINE_string(tokensdir, "", "dictionary directory");

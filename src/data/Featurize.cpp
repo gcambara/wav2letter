@@ -89,6 +89,17 @@ W2lFeatureData featurize(
     if (FLAGS_mfsc) {
       auto& mfsc = getMfsc();
       featSz = mfsc.getFeatureParams().mfscFeatSz();
+      if (FLAGS_pitch) {
+        featSz += mfsc.getFeatureParams().pitchFeatSz();
+        if (FLAGS_jitterabsolute)
+          featSz += 1;
+        if (FLAGS_jitterrelative)
+          featSz += 1;
+        if (FLAGS_shimmerdb)
+          featSz += 1;
+        if (FLAGS_shimmerapq3)
+          featSz += 1;
+      }
       inFeat = mfsc.batchApply(inFeat, FLAGS_channels * batchSz);
     }
     if (FLAGS_pow) {
@@ -96,6 +107,7 @@ W2lFeatureData featurize(
       featSz = powspec.getFeatureParams().powSpecFeatSz();
       inFeat = powspec.batchApply(inFeat, FLAGS_channels * batchSz);
     }
+
     T = inFeat.size() / (FLAGS_channels * batchSz * featSz);
     // Before: FEAT X FRAMES X CHANNELS X BATCHSIZE (Col Major)
     inFeat = transpose2d<float>(inFeat, T, featSz, FLAGS_channels * batchSz);
@@ -244,6 +256,18 @@ int64_t getSpeechFeatureSize() {
     numFeatures = featparams.mfscFeatSz();
   } else if (FLAGS_mfcc) {
     numFeatures = featparams.mfccFeatSz();
+  }
+
+  if (FLAGS_pitch) {
+    numFeatures += featparams.pitchFeatSz();
+    if (FLAGS_jitterabsolute)
+      numFeatures += 1;
+    if (FLAGS_jitterrelative)
+      numFeatures += 1;
+    if (FLAGS_shimmerdb)
+      numFeatures += 1;
+    if (FLAGS_shimmerapq3)
+      numFeatures += 1;
   }
   return numFeatures;
 }

@@ -13,6 +13,7 @@
 #include "PowerSpectrum.h"
 #include "SpeechUtils.h"
 #include "TriFilterbank.h"
+#include "Pitch.h"
 
 namespace w2l {
 

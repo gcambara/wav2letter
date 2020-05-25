@@ -124,6 +124,27 @@ DECLARE_int64(fftcachesize);
 DECLARE_int64(framesizems);
 DECLARE_int64(framestridems);
 
+/* ========== PITCH OPTIONS ========== */
+DECLARE_bool(pitch);
+DECLARE_int64(pitchframesizems);
+DECLARE_int64(pitchframestridems);
+DECLARE_double(lowpasscutoff);
+DECLARE_int64(lowpassfilterwidth);
+DECLARE_double(minF0);
+DECLARE_double(maxF0);
+DECLARE_double(softMinF0);
+DECLARE_double(nccfBallast);
+DECLARE_double(penaltyFactor);
+DECLARE_double(deltaPitch);
+DECLARE_double(resampleFrequency);
+DECLARE_int64(upsampleFilterWidth);
+DECLARE_bool(jitterabsolute);
+DECLARE_bool(jitterrelative);
+DECLARE_bool(shimmerdb);
+DECLARE_bool(shimmerrelative);
+DECLARE_bool(shimmerapq3);
+DECLARE_int64(voicequalityaveragems);
+
 /* ========== RUN OPTIONS ========== */
 
 DECLARE_string(datadir);

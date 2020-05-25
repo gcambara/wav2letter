@@ -14,6 +14,9 @@
 
 #include "SpeechUtils.h"
 
+#include <fstream>
+#include <iostream>
+
 namespace w2l {
 
 template <typename T>
@@ -74,8 +77,17 @@ std::vector<T> Mfsc<T>::apply(const std::vector<T>& input) {
     std::swap(mfscFeat, newMfscFeat);
     ++numFeat;
   }
+
   // Derivatives will not be computed if windowsize < 0
-  return derivatives_.apply(mfscFeat, numFeat);
+  auto features = derivatives_.apply(mfscFeat, numFeat);
+
+  if (FLAGS_pitch) {
+    // Compute pitch info if specified.
+    Pitch<T> pitchExtractor(this->featParams_);
+    features = pitchExtractor.apply(input, features, nFrames, numFeat);
+  }
+
+  return features;
 }
 
 template <typename T>
@@ -96,7 +108,22 @@ std::vector<T> Mfsc<T>::mfscImpl(std::vector<T>& frames) {
 
 template <typename T>
 int64_t Mfsc<T>::outputSize(int64_t inputSz) {
-  return this->featParams_.mfscFeatSz() * this->featParams_.numFrames(inputSz);
+  if (FLAGS_pitch) {
+    int64_t pitchFeatureSize = this->featParams_.pitchFeatSz();
+    if (FLAGS_jitterabsolute)
+      pitchFeatureSize += 1;
+    if (FLAGS_jitterrelative)
+      pitchFeatureSize += 1;
+    if (FLAGS_shimmerdb)
+      pitchFeatureSize += 1;
+    if (FLAGS_shimmerrelative)
+      pitchFeatureSize += 1;
+    if (FLAGS_shimmerapq3)
+      pitchFeatureSize += 1;
+    return (this->featParams_.mfscFeatSz() + pitchFeatureSize) * this->featParams_.numFrames(inputSz);
+  }
+  else
+    return this->featParams_.mfscFeatSz() * this->featParams_.numFrames(inputSz);
 }
 
 template <typename T>

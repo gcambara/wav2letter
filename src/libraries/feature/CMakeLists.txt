@@ -34,6 +34,7 @@ target_sources(
   ${CMAKE_CURRENT_SOURCE_DIR}/Dither.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Mfcc.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Mfsc.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Pitch.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/PowerSpectrum.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/PreEmphasis.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SpeechUtils.cpp

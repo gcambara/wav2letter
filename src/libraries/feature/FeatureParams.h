@@ -55,6 +55,45 @@ struct FeatureParams {
   //  number of acceleration (second order regression) coefficients
   int64_t accWindow;
 
+  // pitch frame size in milliseconds
+  int64_t pitchFrameSizeMs;
+
+  // pitch frame stride in milliseconds
+  int64_t pitchFrameStrideMs;
+
+  // low pass filter cutoff in Hertz
+  float lowPassCutoff;
+
+  // low pass filter width
+  int64_t lowPassFilterWidth;
+
+  // minimum possible frequency value in Hertz
+  float minF0;
+
+  // maximum possible frequency value in Hertz
+  float maxF0;
+
+  // minimum f0, applied in soft way, must not exceed min-f0
+  float softMinF0;
+
+  // increasing this factor reduces NCCF for quiet frames
+  float nccfBallast;
+
+  // factor that penalizes frequency change
+  float penaltyFactor;
+
+  // smallest relative change in pitch measured by the algorithm
+  float deltaPitch;
+
+  // sample frequency for NCCF, must exceed twice lowpass-cutoff
+  float resampleFrequency;
+
+  // integer that determines filter width when upsampling NCCF
+  int64_t upsampleFilterWidth;
+
+  // time in milliseconds to average voice quality parameters
+  int64_t voiceQualityAverageMs;
+
   // analysis window function handle for framing (hamming by default)
   WindowType windowType;
 
@@ -91,6 +130,19 @@ struct FeatureParams {
       int64_t lifterparam = 22,
       int64_t deltawindow = 2,
       int64_t accwindow = 2,
+      int64_t pitchframesizems = 25,
+      int64_t pitchframestridems = 10,
+      float lowpasscutoff = 1000,
+      int64_t lowpassfilterwidth = 2,
+      float minf0 = 50,
+      float maxf0 = 400,
+      float softminf0 = 10,
+      float nccfballast = 0.625,
+      float penaltyfactor = 0.1,
+      float deltapitch = 0.005,
+      float resamplefrequency = 4000,
+      int64_t upsamplefilterwidth = 5,
+      int64_t voicequalityaveragems = 500,
       WindowType windowtype = WindowType::HAMMING,
       float preemcoef = 0.97,
       float melfloor = 1.0,
@@ -109,6 +161,19 @@ struct FeatureParams {
         lifterParam(lifterparam),
         deltaWindow(deltawindow),
         accWindow(accwindow),
+        pitchFrameSizeMs(pitchframesizems),
+        pitchFrameStrideMs(pitchframestridems),
+        lowPassCutoff(lowpasscutoff),
+        lowPassFilterWidth(lowpassfilterwidth),
+        minF0(minf0),
+        maxF0(maxf0),
+        softMinF0(softminf0),
+        nccfBallast(nccfballast),
+        penaltyFactor(penaltyfactor),
+        deltaPitch(deltapitch),
+        resampleFrequency(resamplefrequency),
+        upsampleFilterWidth(upsamplefilterwidth),
+        voiceQualityAverageMs(voicequalityaveragems),
         windowType(windowtype),
         preemCoef(preemcoef),
         melFloor(melfloor),
@@ -151,6 +216,11 @@ struct FeatureParams {
     int64_t devMultiplier =
         1 + (deltaWindow > 0 ? 1 : 0) + (accWindow > 0 ? 1 : 0);
     return numCepstralCoeffs * devMultiplier;
+  }
+
+  int64_t pitchFeatSz() const {
+    // Three pitch features: pitch, POV and deltaPitch.
+    return 3;
   }
 
   int64_t numFrames(int64_t inSize) const {
