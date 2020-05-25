@@ -9,7 +9,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "libraries/decoder/LexiconDecoder.h"
+#include "libraries/decoder/WordLMDecoder.h"
 
 #ifdef W2L_LIBRARIES_USE_KENLM
 #include "libraries/lm/KenLM.h"
@@ -20,12 +20,10 @@ using namespace w2l;
 using namespace py::literals;
 
 /**
- * Some hackery that lets pybind11 handle shared_ptr<void> (for old LMStatePtr).
+ * Some hackery that lets pybind11 handle shared_ptr<void> (for LMStatePtr).
  * See: https://github.com/pybind/pybind11/issues/820
- * PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>);
- * and inside PYBIND11_MODULE
- *   py::class_<std::shared_ptr<void>>(m, "encapsulated_data");
  */
+PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>);
 
 namespace {
 
@@ -35,7 +33,10 @@ namespace {
  * with KenLM, or have their own custom LM implementation.
  * See: https://pybind11.readthedocs.io/en/stable/advanced/classes.html
  *
- * TODO: ensure this works. Last time Jeff tried this there were slicing issues,
+ * Currently this works in principle, but is very slow due to
+ * decoder calling `compareState` a huge number of times.
+ *
+ * TODO: ensure this works. Last time I tried this there were slicing issues,
  * see https://github.com/pybind/pybind11/issues/1546 for workarounds.
  * This is low-pri since we assume most people can just build with KenLM.
  */
@@ -56,56 +57,23 @@ class PyLM : public LM {
   LMOutput finish(const LMStatePtr& state) override {
     PYBIND11_OVERLOAD_PURE(LMOutput, LM, finish, state);
   }
+
+  int compareState(const LMStatePtr& state1, const LMStatePtr& state2)
+      const override {
+    PYBIND11_OVERLOAD_PURE(int, LM, compareState, state1, state2);
+  }
 };
 
-/**
- * Using custom python LMState derived from LMState is not working with
- * custom python LM (derived from PyLM) because we need to to custing of LMState
- * in score and finish functions to the derived class
- * (for example vie obj.__class__ = CustomPyLMSTate) which cause the error
- * "TypeError: __class__ assignment: 'CustomPyLMState' deallocator differs
- * from 'wav2letter._decoder.LMState'"
- * details see in https://github.com/pybind/pybind11/issues/1640
- * To define custom LM you can introduce map inside LM which maps LMstate to
- * additional state info (shared pointers pointing to the same underlying object
- * will have the same id in python in functions score and finish)
- *
- * ```python
- * from wav2letter.decoder import LM
- * class MyPyLM(LM):
- *      mapping_states = dict() # store simple additional int for each state
- *
- *      def __init__(self):
- *          LM.__init__(self)
- *
- *       def start(self, start_with_nothing):
- *          state = LMState()
- *          self.mapping_states[state] = 0
- *          return state
- *
- *      def score(self, state, index):
- *          outstate = state.child(index)
- *          if outstate not in self.mapping_states:
- *              self.mapping_states[outstate] = self.mapping_states[state] + 1
- *          return (outstate, -numpy.random.random())
- *
- *      def finish(self, state):
- *          outstate = state.child(-1)
- *          if outstate not in self.mapping_states:
- *              self.mapping_states[outstate] = self.mapping_states[state] + 1
- *          return (outstate, -1)
- *```
- */
-void LexiconDecoder_decodeStep(
-    LexiconDecoder& decoder,
+void WordLMDecoder_decodeStep(
+    WordLMDecoder& decoder,
     uintptr_t emissions,
     int T,
     int N) {
   decoder.decodeStep(reinterpret_cast<const float*>(emissions), T, N);
 }
 
-std::vector<DecodeResult> LexiconDecoder_decode(
-    LexiconDecoder& decoder,
+std::vector<DecodeResult> WordLMDecoder_decode(
+    WordLMDecoder& decoder,
     uintptr_t emissions,
     int T,
     int N) {
@@ -115,6 +83,8 @@ std::vector<DecodeResult> LexiconDecoder_decode(
 } // namespace
 
 PYBIND11_MODULE(_decoder, m) {
+  py::class_<std::shared_ptr<void>>(m, "encapsulated_data");
+
   py::enum_<SmearingMode>(m, "SmearingMode")
       .value("NONE", SmearingMode::NONE)
       .value("MAX", SmearingMode::MAX)
@@ -139,13 +109,8 @@ PYBIND11_MODULE(_decoder, m) {
       .def(py::init<>())
       .def("start", &LM::start, "start_with_nothing"_a)
       .def("score", &LM::score, "state"_a, "usr_token_idx"_a)
-      .def("finish", &LM::finish, "state"_a);
-
-  py::class_<LMState, LMStatePtr>(m, "LMState")
-      .def(py::init<>())
-      .def_readwrite("children", &LMState::children)
-      .def("compare", &LMState::compare, "state"_a)
-      .def("child", &LMState::child<LMState>, "usr_index"_a);
+      .def("finish", &LM::finish, "state"_a)
+      .def("compare_state", &LM::compareState, "state1"_a, "state2"_a);
 
 #ifdef W2L_LIBRARIES_USE_KENLM
   py::class_<KenLM, KenLMPtr, LM>(m, "KenLM")
@@ -163,34 +128,28 @@ PYBIND11_MODULE(_decoder, m) {
       .def(
           py::init<
               const int,
-              const int,
-              const double,
-              const double,
-              const double,
-              const double,
-              const double,
-              const double,
+              const float,
+              const float,
+              const float,
+              const float,
               const bool,
+              const float,
               const CriterionType>(),
           "beam_size"_a,
-          "beam_size_token"_a,
           "beam_threshold"_a,
           "lm_weight"_a,
           "word_score"_a,
           "unk_score"_a,
-          "sil_score"_a,
-          "eos_score"_a,
           "log_add"_a,
+          "sil_weight"_a,
           "criterion_type"_a)
       .def_readwrite("beam_size", &DecoderOptions::beamSize)
-      .def_readwrite("beam_size_token", &DecoderOptions::beamSizeToken)
       .def_readwrite("beam_threshold", &DecoderOptions::beamThreshold)
       .def_readwrite("lm_weight", &DecoderOptions::lmWeight)
       .def_readwrite("word_score", &DecoderOptions::wordScore)
       .def_readwrite("unk_score", &DecoderOptions::unkScore)
-      .def_readwrite("sil_score", &DecoderOptions::silScore)
-      .def_readwrite("eos_score", &DecoderOptions::silScore)
       .def_readwrite("log_add", &DecoderOptions::logAdd)
+      .def_readwrite("sil_weight", &DecoderOptions::silWeight)
       .def_readwrite("criterion_type", &DecoderOptions::criterionType);
 
   py::class_<DecodeResult>(m, "DecodeResult")
@@ -200,7 +159,7 @@ PYBIND11_MODULE(_decoder, m) {
       .def_readwrite("tokens", &DecodeResult::tokens);
 
   // NB: `decode` and `decodeStep` expect raw emissions pointers.
-  py::class_<LexiconDecoder>(m, "LexiconDecoder")
+  py::class_<WordLMDecoder>(m, "WordLMDecoder")
       .def(py::init<
            const DecoderOptions&,
            const TriePtr,
@@ -208,21 +167,16 @@ PYBIND11_MODULE(_decoder, m) {
            const int,
            const int,
            const int,
-           const std::vector<float>&,
-           const bool>())
-      .def("decode_begin", &LexiconDecoder::decodeBegin)
+           const std::vector<float>&>())
+      .def("decode_begin", &WordLMDecoder::decodeBegin)
       .def(
-          "decode_step",
-          &LexiconDecoder_decodeStep,
-          "emissions"_a,
-          "T"_a,
-          "N"_a)
-      .def("decode_end", &LexiconDecoder::decodeEnd)
-      .def("decode", &LexiconDecoder_decode, "emissions"_a, "T"_a, "N"_a)
-      .def("prune", &LexiconDecoder::prune, "look_back"_a = 0)
+          "decode_step", &WordLMDecoder_decodeStep, "emissions"_a, "T"_a, "N"_a)
+      .def("decode_end", &WordLMDecoder::decodeEnd)
+      .def("decode", &WordLMDecoder_decode, "emissions"_a, "T"_a, "N"_a)
+      .def("prune", &WordLMDecoder::prune, "look_back"_a = 0)
       .def(
           "get_best_hypothesis",
-          &LexiconDecoder::getBestHypothesis,
+          &WordLMDecoder::getBestHypothesis,
           "look_back"_a = 0)
-      .def("get_all_final_hypothesis", &LexiconDecoder::getAllFinalHypothesis);
+      .def("get_all_final_hypothesis", &WordLMDecoder::getAllFinalHypothesis);
 }

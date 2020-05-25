@@ -18,7 +18,8 @@ namespace w2l {
 
 // Computes MFSC features for a speech signal.
 
-class Mfsc : public PowerSpectrum {
+template <typename T>
+class Mfsc : public PowerSpectrum<T> {
  public:
   explicit Mfsc(const FeatureParams& params);
 
@@ -26,18 +27,18 @@ class Mfsc : public PowerSpectrum {
 
   // input - input speech signal (T)
   // Returns - MFSC feature (Col Major : FEAT X FRAMESZ)
-  std::vector<float> apply(const std::vector<float>& input) override;
+  std::vector<T> apply(const std::vector<T>& input) override;
 
-  int outputSize(int inputSz) override;
+  int64_t outputSize(int64_t inputSz) override;
 
  protected:
   // Helper function which takes input as signal after dividing the signal into
   // frames. Main purpose of this function is to reuse it in MFCC code
-  std::vector<float> mfscImpl(std::vector<float>& frames);
+  std::vector<T> mfscImpl(std::vector<T>& frames);
   void validateMfscParams() const;
 
  private:
-  TriFilterbank triFltBank_;
-  Derivatives derivatives_;
+  TriFilterbank<T> triFltBank_;
+  Derivatives<T> derivatives_;
 };
 } // namespace w2l

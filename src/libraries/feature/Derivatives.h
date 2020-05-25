@@ -18,20 +18,21 @@ namespace w2l {
 //    d(i) =    0.5 * SUM_t (t * (c(i + t) - c (i - t))) / SUM_t t^2
 //      where t in [1, maxlagsize]
 
+template <typename T>
 class Derivatives {
  public:
-  Derivatives(int deltawindow, int accwindow);
+  Derivatives(int64_t deltawindow, int64_t accwindow);
 
-  std::vector<float> apply(const std::vector<float>& input, int numfeat) const;
+  std::vector<T> apply(const std::vector<T>& input, int64_t numfeat) const;
 
  private:
-  int deltaWindow_; // delta derivatives lag size
-  int accWindow_; // acceleration derivatives lag size
+  int64_t deltaWindow_; // delta derivatives lag size
+  int64_t accWindow_; // acceleration derivatives lag size
 
   // Helper function to compute derivatives of single order
-  std::vector<float> computeDerivative(
-      const std::vector<float>& input,
-      int windowlen,
-      int numfeat) const;
+  std::vector<T> computeDerivative(
+      const std::vector<T>& input,
+      int64_t windowlen,
+      int64_t numfeat) const;
 };
 } // namespace w2l

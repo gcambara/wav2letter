@@ -367,11 +367,6 @@ template std::vector<double> w2l::loadSound(const std::string&);
 template std::vector<int> w2l::loadSound(const std::string&);
 template std::vector<short> w2l::loadSound(const std::string&);
 
-template std::vector<float> w2l::loadSound<float>(std::istream&);
-template std::vector<double> w2l::loadSound<double>(std::istream&);
-template std::vector<int> w2l::loadSound<int>(std::istream&);
-template std::vector<short> w2l::loadSound<short>(std::istream&);
-
 template void w2l::saveSound(
     const std::string&,
     const std::vector<float>&,

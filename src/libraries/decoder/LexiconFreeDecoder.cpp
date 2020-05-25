@@ -6,22 +6,90 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <float.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <numeric>
 
 #include "libraries/decoder/LexiconFreeDecoder.h"
 
 namespace w2l {
+
+void LexiconFreeDecoder::candidatesReset() {
+  candidatesBestScore_ = kNegativeInfinity;
+  candidates_.clear();
+  candidatePtrs_.clear();
+}
+
+void LexiconFreeDecoder::mergeCandidates() {
+  auto compareNodesShortList = [&](const LexiconFreeDecoderState* node1,
+                                   const LexiconFreeDecoderState* node2) {
+    int lmCmp = lm_->compareState(node1->lmState, node2->lmState);
+    if (lmCmp != 0) {
+      return lmCmp > 0;
+    } else { /* same LmState */
+      return node1->score > node2->score;
+    }
+  };
+  std::sort(
+      candidatePtrs_.begin(), candidatePtrs_.end(), compareNodesShortList);
+
+  int nHypAfterMerging = 1;
+  for (int i = 1; i < candidatePtrs_.size(); i++) {
+    if (lm_->compareState(
+            candidatePtrs_[i]->lmState,
+            candidatePtrs_[nHypAfterMerging - 1]->lmState)) {
+      candidatePtrs_[nHypAfterMerging] = candidatePtrs_[i];
+      nHypAfterMerging++;
+    } else {
+      mergeStates(
+          candidatePtrs_[nHypAfterMerging - 1], candidatePtrs_[i], opt_.logAdd);
+    }
+  }
+
+  candidatePtrs_.resize(nHypAfterMerging);
+}
+
+void LexiconFreeDecoder::candidatesAdd(
+    const LMStatePtr& lmState,
+    const LexiconFreeDecoderState* parent,
+    const float score,
+    const int token,
+    const bool prevBlank) {
+  if (isValidCandidate(candidatesBestScore_, score, opt_.beamThreshold)) {
+    candidates_.emplace_back(
+        LexiconFreeDecoderState(lmState, parent, score, token, prevBlank));
+  }
+}
+
+void LexiconFreeDecoder::candidatesStore(
+    std::vector<LexiconFreeDecoderState>& nextHyp,
+    const bool returnSorted) {
+  if (candidates_.empty()) {
+    nextHyp.clear();
+    return;
+  }
+
+  /* Select valid candidates */
+  pruneCandidates(
+      candidatePtrs_, candidates_, candidatesBestScore_ - opt_.beamThreshold);
+
+  /* Sort by (LmState, lex, score) and copy into next hypothesis */
+  mergeCandidates();
+
+  /* Sort hypothesis and select top-K */
+  storeTopCandidates(nextHyp, candidatePtrs_, opt_.beamSize, returnSorted);
+}
 
 void LexiconFreeDecoder::decodeBegin() {
   hyp_.clear();
   hyp_.emplace(0, std::vector<LexiconFreeDecoderState>());
 
   /* note: the lm reset itself with :start() */
-  hyp_[0].emplace_back(0.0, lm_->start(0), nullptr, sil_);
+  hyp_[0].emplace_back(lm_->start(0), nullptr, 0.0, sil_);
   nDecodedFrames_ = 0;
   nPrunedFrames_ = 0;
 }
@@ -35,124 +103,83 @@ void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
     }
   }
 
-  std::vector<size_t> idx(N);
   // Looping over all the frames
   for (int t = 0; t < T; t++) {
-    std::iota(idx.begin(), idx.end(), 0);
-    if (N > opt_.beamSizeToken) {
-      std::partial_sort(
-          idx.begin(),
-          idx.begin() + opt_.beamSizeToken,
-          idx.end(),
-          [&t, &N, &emissions](const size_t& l, const size_t& r) {
-            return emissions[t * N + l] > emissions[t * N + r];
-          });
-    }
-
-    candidatesReset(candidatesBestScore_, candidates_, candidatePtrs_);
+    candidatesReset();
     for (const LexiconFreeDecoderState& prevHyp : hyp_[startFrame + t]) {
-      const int prevIdx = prevHyp.token;
+      const LMStatePtr& prevLmState = prevHyp.lmState;
 
-      for (int r = 0; r < std::min(opt_.beamSizeToken, N); ++r) {
-        int n = idx[r];
-        double amScore = emissions[t * N + n];
+      const int prevIdx = prevHyp.token;
+      for (int n = 0; n < N; n++) {
+        float score = prevHyp.score + emissions[t * N + n];
         if (nDecodedFrames_ + t > 0 &&
             opt_.criterionType == CriterionType::ASG) {
-          amScore += transitions_[n * N + prevIdx];
+          score += transitions_[n * N + prevIdx];
         }
-        double score = prevHyp.score + emissions[t * N + n];
         if (n == sil_) {
-          score += opt_.silScore;
+          score += opt_.silWeight;
+          if (prevIdx != sil_) {
+            score += opt_.wordScore;
+          }
         }
 
+        // DEBUG: CTC branch is not tested
         if ((opt_.criterionType == CriterionType::ASG && n != prevIdx) ||
             (opt_.criterionType == CriterionType::CTC && n != blank_ &&
              (n != prevIdx || prevHyp.prevBlank))) {
-          auto lmStateScorePair = lm_->score(prevHyp.lmState, n);
-          auto lmScore = lmStateScorePair.second;
+          auto lmScoreReturn = lm_->score(prevLmState, n);
+          score += lmScoreReturn.second * opt_.lmWeight;
 
           candidatesAdd(
-              candidates_,
-              candidatesBestScore_,
-              opt_.beamThreshold,
-              score + opt_.lmWeight * lmScore,
-              lmStateScorePair.first,
+              lmScoreReturn.first,
               &prevHyp,
+              score,
               n,
-              false, // prevBlank
-              prevHyp.amScore + amScore,
-              prevHyp.lmScore + lmScore);
+              false // prevBlank
+          );
         } else if (opt_.criterionType == CriterionType::CTC && n == blank_) {
           candidatesAdd(
-              candidates_,
-              candidatesBestScore_,
-              opt_.beamThreshold,
-              score,
-              prevHyp.lmState,
+              prevLmState,
               &prevHyp,
+              score,
               n,
-              true, // prevBlank
-              prevHyp.amScore + amScore,
-              prevHyp.lmScore);
+              true // prevBlank
+          );
         } else {
           candidatesAdd(
-              candidates_,
-              candidatesBestScore_,
-              opt_.beamThreshold,
-              score,
-              prevHyp.lmState,
+              prevLmState,
               &prevHyp,
+              score,
               n,
-              false, // prevBlank
-              prevHyp.amScore + amScore,
-              prevHyp.lmScore);
+              false // prevBlank
+          );
         }
       }
     }
 
-    candidatesStore(
-        candidates_,
-        candidatePtrs_,
-        hyp_[startFrame + t + 1],
-        opt_.beamSize,
-        candidatesBestScore_ - opt_.beamThreshold,
-        opt_.logAdd,
-        false);
+    candidatesStore(hyp_[startFrame + t + 1], false);
     updateLMCache(lm_, hyp_[startFrame + t + 1]);
   }
   nDecodedFrames_ += T;
 }
 
 void LexiconFreeDecoder::decodeEnd() {
-  candidatesReset(candidatesBestScore_, candidates_, candidatePtrs_);
+  candidatesReset();
   for (const LexiconFreeDecoderState& prevHyp :
        hyp_[nDecodedFrames_ - nPrunedFrames_]) {
     const LMStatePtr& prevLmState = prevHyp.lmState;
 
-    auto lmStateScorePair = lm_->finish(prevLmState);
-    auto lmScore = lmStateScorePair.second;
-
+    auto lmScoreReturn = lm_->finish(prevLmState);
     candidatesAdd(
-        candidates_,
-        candidatesBestScore_,
-        opt_.beamThreshold,
-        prevHyp.score + opt_.lmWeight * lmScore,
-        lmStateScorePair.first,
+        lmScoreReturn.first,
         &prevHyp,
+        prevHyp.score + opt_.lmWeight * lmScoreReturn.second,
         sil_,
-        false, // prevBlank
-        prevHyp.amScore,
-        prevHyp.lmScore + lmScore);
+        false // prevBlank
+    );
   }
 
-  candidatesStore(
-      candidates_,
-      candidatePtrs_,
-      hyp_[nDecodedFrames_ - nPrunedFrames_ + 1],
-      opt_.beamSize,
-      candidatesBestScore_ - opt_.beamThreshold,
-      opt_.logAdd,
-      true);
+  candidatesStore(hyp_[nDecodedFrames_ - nPrunedFrames_ + 1], true);
   ++nDecodedFrames_;
 }
 

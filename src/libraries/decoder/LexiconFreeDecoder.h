@@ -18,51 +18,30 @@ namespace w2l {
  * LexiconFreeDecoderState stores information for each hypothesis in the beam.
  */
 struct LexiconFreeDecoderState {
-  double score; // Accumulated total score so far
   LMStatePtr lmState; // Language model state
   const LexiconFreeDecoderState* parent; // Parent hypothesis
+  float score; // Score so far
   int token; // Label of token
   bool prevBlank; // If previous hypothesis is blank (for CTC only)
 
-  double amScore; // Accumulated AM score so far
-  double lmScore; // Accumulated LM score so far
-
   LexiconFreeDecoderState(
-      const double score,
       const LMStatePtr& lmState,
       const LexiconFreeDecoderState* parent,
+      const float score,
       const int token,
-      const bool prevBlank = false,
-      const double amScore = 0,
-      const double lmScore = 0)
-      : score(score),
-        lmState(lmState),
+      const bool prevBlank = false)
+      : lmState(lmState),
         parent(parent),
+        score(score),
         token(token),
-        prevBlank(prevBlank),
-        amScore(amScore),
-        lmScore(lmScore) {}
+        prevBlank(prevBlank) {}
 
   LexiconFreeDecoderState()
-      : score(0),
-        lmState(nullptr),
+      : lmState(nullptr),
         parent(nullptr),
+        score(0),
         token(-1),
-        prevBlank(false),
-        amScore(0.),
-        lmScore(0.) {}
-
-  int compareNoScoreStates(const LexiconFreeDecoderState* node) const {
-    int lmCmp = lmState->compare(node->lmState);
-    if (lmCmp != 0) {
-      return lmCmp > 0 ? 1 : -1;
-    } else if (token != node->token) {
-      return token > node->token ? 1 : -1;
-    } else if (prevBlank != node->prevBlank) {
-      return prevBlank > node->prevBlank ? 1 : -1;
-    }
-    return 0;
-  }
+        prevBlank(false) {}
 
   int getWord() const {
     return -1;
@@ -77,7 +56,8 @@ struct LexiconFreeDecoderState {
  * Decoder implements a beam seach decoder that finds the word transcription
  * W maximizing:
  *
- * AM(W) + lmWeight_ * log(P_{lm}(W)) + silScore_ * |{i| pi_i = <sil>}|
+ * AM(W) + lmWeight_ * log(P_{lm}(W)) + wordScore_ * |W_known| - silWeight_ *
+ * |{i| pi_i = <sil>}|
  *
  * where P_{lm}(W) is the language model score, pi_i is the value for the i-th
  * frame in the path leading to W and AM(W) is the (unnormalized) acoustic model
@@ -127,7 +107,7 @@ class LexiconFreeDecoder : public Decoder {
   std::vector<LexiconFreeDecoderState*> candidatePtrs_;
 
   // Best candidate score of current frame
-  double candidatesBestScore_;
+  float candidatesBestScore_;
 
   // Index of silence label
   int sil_;
@@ -141,6 +121,26 @@ class LexiconFreeDecoder : public Decoder {
   // These 2 variables are used for online decoding, for hypothesis pruning
   int nDecodedFrames_; // Total number of decoded frames.
   int nPrunedFrames_; // Total number of pruned frames from hyp_.
+
+  // Reset candidates buffer for decoding a new input frame
+  void candidatesReset();
+
+  // Add a new candidate to the buffer
+  void candidatesAdd(
+      const LMStatePtr& lmState,
+      const LexiconFreeDecoderState* parent,
+      const float score,
+      const int token,
+      const bool prevBlank);
+
+  // Merge and sort candidates proposed in the current frame and place them into
+  // the `hyp_` buffer
+  void candidatesStore(
+      std::vector<LexiconFreeDecoderState>& nextHyp,
+      const bool isSort);
+
+  // Merge hypothesis getting into same state from different path
+  void mergeCandidates();
 };
 
 } // namespace w2l

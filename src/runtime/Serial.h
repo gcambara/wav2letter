@@ -48,15 +48,13 @@ struct W2lSerializer {
     try {
       std::ofstream file(filepath, std::ios::binary);
       if (!file.is_open()) {
-        throw std::runtime_error(
-            "failed to open file for writing: " + filepath);
+        throw std::runtime_error("failed to open file for writing");
       }
       cereal::BinaryOutputArchive ar(file);
       ar(std::string(W2L_VERSION));
       ar(args...);
     } catch (const std::exception& ex) {
-      LOG(ERROR) << "Error while saving \"" << filepath << "\": " << ex.what()
-                 << "\n";
+      LOG(ERROR) << "Error while saving: " << ex.what() << "\n";
       throw;
     }
   }
@@ -66,19 +64,39 @@ struct W2lSerializer {
     try {
       std::ifstream file(filepath, std::ios::binary);
       if (!file.is_open()) {
-        throw std::runtime_error(
-            "failed to open file for reading: " + filepath);
+        throw std::runtime_error("failed to open file for reading");
       }
       std::string version;
       cereal::BinaryInputArchive ar(file);
       ar(version);
       ar(args...);
     } catch (const std::exception& ex) {
-      LOG(ERROR) << "Error while loading \"" << filepath << "\": " << ex.what()
-                 << "\n";
+      LOG(ERROR) << "Error while loading: " << ex.what() << "\n";
       throw;
     }
   }
+};
+
+// Convenience struct for serializing emissions and targets
+struct EmissionSet {
+  std::vector<std::vector<float>> emissions;
+  std::vector<std::vector<std::string>> wordTargets;
+  std::vector<std::vector<int>> tokenTargets;
+  std::vector<std::string> sampleIds;
+  std::vector<float> transition;
+  std::vector<int> emissionT;
+  int emissionN; // Assume alphabet size to be identical for all the samples
+  std::string gflags; // Saving all the flags used in model training
+
+  FL_SAVE_LOAD(
+      emissions,
+      wordTargets,
+      tokenTargets,
+      sampleIds,
+      transition,
+      emissionT,
+      emissionN,
+      gflags)
 };
 
 std::string newRunPath(
@@ -93,45 +111,8 @@ getRunFile(const std::string& name, int runidx, const std::string& runpath);
  * Given a filename, remove any filepath delimiters - returns a contiguous
  * string that won't be subdivided into a filepath
  */
-std::string cleanFilepath(const std::string& inputFileName);
+std::string cleanFilepath(const std::string& in);
 
-/**
- * Serialize gflags into a buffer
- *
- * Only serializes gflags that aren't explicitly deprecated
- */
 std::string serializeGflags(const std::string& separator = "\n");
-
-// ========================= Decoder helpers ==============================
-// Convenience structs for serializing emissions and targets
-struct EmissionUnit {
-  std::vector<float> emission; // A column-major tensor with shape T x N.
-  std::string sampleId;
-  int nFrames;
-  int nTokens;
-
-  FL_SAVE_LOAD(emission, sampleId, nFrames, nTokens)
-
-  EmissionUnit() : nFrames(0), nTokens(0) {}
-
-  EmissionUnit(
-      const std::vector<float>& emission,
-      const std::string& sampleId,
-      int nFrames,
-      int nTokens)
-      : emission(emission),
-        sampleId(sampleId),
-        nFrames(nFrames),
-        nTokens(nTokens) {}
-};
-
-struct TargetUnit {
-  std::vector<std::string> wordTargetStr; // Word targets in strings
-  std::vector<int> tokenTarget; // Token targets in indices
-
-  FL_SAVE_LOAD(wordTargetStr, tokenTarget)
-};
-
-using EmissionTargetPair = std::pair<EmissionUnit, TargetUnit>;
 
 } // namespace w2l

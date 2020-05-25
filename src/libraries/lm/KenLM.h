@@ -11,7 +11,16 @@
 #include "libraries/common/Dictionary.h"
 #include "libraries/lm/LM.h"
 
-#include <lm/model.hh>
+// KenLM forward declarations
+namespace lm {
+namespace base {
+class Model;
+class Vocabulary;
+} // namespace base
+namespace ngram {
+class State;
+} // namespace ngram
+} // namespace lm
 
 namespace w2l {
 /**
@@ -19,13 +28,7 @@ namespace w2l {
  * indicies and compare functions
  * https://github.com/kpu/kenlm/blob/master/lm/state.hh.
  */
-
-struct KenLMState : LMState {
-  lm::ngram::State ken_;
-  lm::ngram::State* ken() {
-    return &ken_;
-  }
-};
+using KenLMState = lm::ngram::State;
 
 /**
  * KenLM extends LM by using the toolkit https://kheafield.com/code/kenlm/.
@@ -42,9 +45,14 @@ class KenLM : public LM {
 
   std::pair<LMStatePtr, float> finish(const LMStatePtr& state) override;
 
+  int compareState(const LMStatePtr& state1, const LMStatePtr& state2)
+      const override;
+
  private:
   std::shared_ptr<lm::base::Model> model_;
   const lm::base::Vocabulary* vocab_;
+
+  static KenLMState* getRawState(const LMStatePtr& state);
 };
 
 using KenLMPtr = std::shared_ptr<KenLM>;

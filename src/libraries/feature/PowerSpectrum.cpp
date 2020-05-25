@@ -16,7 +16,8 @@
 
 namespace w2l {
 
-PowerSpectrum::PowerSpectrum(const FeatureParams& params)
+template <typename T>
+PowerSpectrum<T>::PowerSpectrum(const FeatureParams& params)
     : featParams_(params),
       dither_(params.ditherVal),
       preEmphasis_(params.preemCoef, params.numFrameSizeSamples()),
@@ -29,7 +30,8 @@ PowerSpectrum::PowerSpectrum(const FeatureParams& params)
       nFFt, inFftBuf_.data(), (fftw_complex*)outFftBuf_.data(), FFTW_MEASURE);
 }
 
-std::vector<float> PowerSpectrum::apply(const std::vector<float>& input) {
+template <typename T>
+std::vector<T> PowerSpectrum<T>::apply(const std::vector<T>& input) {
   auto frames = frameSignal(input, featParams_);
   if (frames.empty()) {
     return {};
@@ -37,11 +39,12 @@ std::vector<float> PowerSpectrum::apply(const std::vector<float>& input) {
   return powSpectrumImpl(frames);
 }
 
-std::vector<float> PowerSpectrum::powSpectrumImpl(std::vector<float>& frames) {
-  int nSamples = featParams_.numFrameSizeSamples();
-  int nFrames = frames.size() / nSamples;
-  int nFft = featParams_.nFft();
-  int K = featParams_.filterFreqResponseLen();
+template <typename T>
+std::vector<T> PowerSpectrum<T>::powSpectrumImpl(std::vector<T>& frames) {
+  int64_t nSamples = featParams_.numFrameSizeSamples();
+  int64_t nFrames = frames.size() / nSamples;
+  int64_t nFft = featParams_.nFft();
+  int64_t K = featParams_.filterFreqResponseLen();
 
   if (featParams_.ditherVal != 0.0) {
     frames = dither_.apply(frames);
@@ -49,17 +52,17 @@ std::vector<float> PowerSpectrum::powSpectrumImpl(std::vector<float>& frames) {
   if (featParams_.zeroMeanFrame) {
     for (size_t f = 0; f < nFrames; ++f) {
       auto begin = frames.data() + f * nSamples;
-      float mean = std::accumulate(begin, begin + nSamples, 0.0);
+      T mean = std::accumulate(begin, begin + nSamples, 0.0);
       mean /= nSamples;
       std::transform(
-          begin, begin + nSamples, begin, [mean](float x) { return x - mean; });
+          begin, begin + nSamples, begin, [mean](T x) { return x - mean; });
     }
   }
   if (featParams_.preemCoef != 0) {
     preEmphasis_.applyInPlace(frames);
   }
   windowing_.applyInPlace(frames);
-  std::vector<float> dft(K * nFrames);
+  std::vector<T> dft(K * nFrames);
   for (size_t f = 0; f < nFrames; ++f) {
     auto begin = frames.data() + f * nSamples;
     {
@@ -84,23 +87,24 @@ std::vector<float> PowerSpectrum::powSpectrumImpl(std::vector<float>& frames) {
   return dft;
 }
 
-std::vector<float> PowerSpectrum::batchApply(
-    const std::vector<float>& input,
-    int batchSz) {
+template <typename T>
+std::vector<T> PowerSpectrum<T>::batchApply(
+    const std::vector<T>& input,
+    int64_t batchSz) {
   if (batchSz <= 0) {
     throw std::invalid_argument("PowerSpectrum: negative batchSz");
   } else if (input.size() % batchSz != 0) {
     throw std::invalid_argument(
         "PowerSpectrum: input size is not divisible by batchSz");
   }
-  int N = input.size() / batchSz;
-  int outputSz = outputSize(N);
-  std::vector<float> feat(outputSz * batchSz);
+  int64_t N = input.size() / batchSz;
+  int64_t outputSz = outputSize(N);
+  std::vector<T> feat(outputSz * batchSz);
 
 #pragma omp parallel for num_threads(batchSz)
-  for (int b = 0; b < batchSz; ++b) {
+  for (int64_t b = 0; b < batchSz; ++b) {
     auto start = input.begin() + b * N;
-    std::vector<float> inputBuf(start, start + N);
+    std::vector<T> inputBuf(start, start + N);
     auto curFeat = apply(inputBuf);
     if (outputSz != curFeat.size()) {
       throw std::logic_error("PowerSpectrum: apply() returned wrong size");
@@ -111,15 +115,18 @@ std::vector<float> PowerSpectrum::batchApply(
   return feat;
 }
 
-FeatureParams PowerSpectrum::getFeatureParams() const {
+template <typename T>
+FeatureParams PowerSpectrum<T>::getFeatureParams() const {
   return featParams_;
 }
 
-int PowerSpectrum::outputSize(int inputSz) {
+template <typename T>
+int64_t PowerSpectrum<T>::outputSize(int64_t inputSz) {
   return featParams_.powSpecFeatSz() * featParams_.numFrames(inputSz);
 }
 
-void PowerSpectrum::validatePowSpecParams() const {
+template <typename T>
+void PowerSpectrum<T>::validatePowSpecParams() const {
   if (featParams_.samplingFreq <= 0) {
     throw std::invalid_argument("PowerSpectrum: samplingFreq is negative");
   } else if (featParams_.frameSizeMs <= 0) {
@@ -133,8 +140,11 @@ void PowerSpectrum::validatePowSpecParams() const {
   }
 }
 
-PowerSpectrum::~PowerSpectrum() {
+template <typename T>
+PowerSpectrum<T>::~PowerSpectrum() {
   fftw_destroy_plan(fftPlan_);
 }
 
+template class PowerSpectrum<float>;
+template class PowerSpectrum<double>;
 } // namespace w2l

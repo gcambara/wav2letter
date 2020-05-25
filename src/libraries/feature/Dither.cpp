@@ -12,20 +12,25 @@
 
 namespace w2l {
 
-Dither::Dither(float ditherVal)
+template <typename T>
+Dither<T>::Dither(T ditherVal)
     : ditherVal_(ditherVal), rng_((ditherVal > 0.0) ? 123456 : time(nullptr)){};
 
-std::vector<float> Dither::apply(const std::vector<float>& input) {
+template <typename T>
+std::vector<T> Dither<T>::apply(const std::vector<T>& input) {
   auto output(input);
   applyInPlace(output);
   return output;
 }
 
-void Dither::applyInPlace(std::vector<float>& input) {
-  std::uniform_real_distribution<float> distribution(0.0, 1.0);
+template <typename T>
+void Dither<T>::applyInPlace(std::vector<T>& input) {
+  std::uniform_real_distribution<T> distribution(0.0, 1.0);
   for (auto& i : input) {
     i += ditherVal_ * distribution(rng_);
   }
 }
 
+template class Dither<float>;
+template class Dither<double>;
 } // namespace w2l

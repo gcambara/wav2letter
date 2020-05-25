@@ -17,4 +17,3 @@
 #include "criterion/LinearSegmentationCriterion.h"
 #include "criterion/Seq2SeqCriterion.h"
 #include "criterion/SequenceCriterion.h"
-#include "criterion/TransformerCriterion.h"

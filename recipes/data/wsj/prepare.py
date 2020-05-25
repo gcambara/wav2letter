@@ -3,9 +3,7 @@ Copyright (c) Facebook, Inc. and its affiliates.
 All rights reserved.
 This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
-
 ----------
-
 Script to package original WSJ datasets into a form readable in wav2letter++
 pipelines
 
@@ -17,7 +15,7 @@ see https://www.ldc.upenn.edu/language-resources/tools/sphere-conversion-tools \
   tar -xzf sph2pipe_v2.5.tar.gz && cd sph2pipe_v2.5
   gcc -o sph2pipe *.c -lm
 
-Command : python3 prepare.py --wsj0 [...]/WSJ0/media \
+Command : python3 prepare_data.py --wsj0 [...]/WSJ0/media \
     --wsj1 [...]/WSJ1/media --dst [...] --sph2pipe [...]/sph2pipe_v2.5/sph2pipe
 
 Replace [...] with appropriate paths
@@ -59,10 +57,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     wsj1_sep = "-" if args.wsj1_type == "LDC94S13A" else "_"
 
-    assert os.path.isdir(str(args.wsj0)), "WSJ0 directory is not found - '{d}'".format(
+    assert os.path.isdir(str(args.wsj0)), "WSJ0 directory not found - '{d}'".format(
         d=args.wsj0
     )
-    assert os.path.isdir(str(args.wsj1)), "WSJ1 directory is not found - '{d}'".format(
+    assert os.path.isdir(str(args.wsj1)), "WSJ1 directory not found - '{d}'".format(
         d=args.wsj1
     )
     assert args.wsj0 != args.wsj1, "WSJ0 and WSJ1 directories can't be the same"
@@ -251,8 +249,8 @@ if __name__ == "__main__":
     ]
     if not os.path.exists(os.path.join(text_path, "cmudict.0.7a")):
         url = "http://svn.code.sf.net/p/cmusphinx/code/trunk/cmudict/cmudict.0.7a"
-        cmd = "cd {} && wget {}".format(text_path, url)
-        os.system(cmd)
+        cmd = "cd {} && wget {}".format(url)
+        os.system(cmd.format(text_path))
     else:
         print("CMU dict already exists, skip its downloading", flush=True)
 

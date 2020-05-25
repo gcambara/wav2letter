@@ -9,10 +9,7 @@
 #include "common/Defines.h"
 
 #include <cstdlib>
-#include <iostream>
 #include <limits>
-#include <mutex>
-#include <sstream>
 
 namespace w2l {
 
@@ -72,28 +69,14 @@ DEFINE_int64(
     "right context size for local normalization");
 DEFINE_string(onorm, "none", "output norm (none");
 DEFINE_bool(sqnorm, false, "use square-root while normalizing criterion loss");
-DEFINE_bool(lrcosine, false, "use cosine learning rate schedule");
 
 // LEARNING HYPER-PARAMETER OPTIONS
-DEFINE_int64(iter, std::numeric_limits<int64_t>::max(), "number of updates");
+DEFINE_int64(iter, 1000000, "number of iterations");
 DEFINE_bool(itersave, false, "save model at each iteration");
 DEFINE_double(lr, 1.0, "learning rate");
 DEFINE_double(momentum, 0.0, "momentum factor");
 DEFINE_double(weightdecay, 0.0, "weight decay (L2 penalty)");
 DEFINE_double(lrcrit, 0, "criterion learning rate");
-DEFINE_int64(warmup, 8000, "the LR warmup parameter, in updates");
-DEFINE_int64(
-    saug_start_update,
-    -1,
-    "Use SpecAugment starting at the update number inputted. -1 means no SpecAugment");
-DEFINE_int64(
-    lr_decay,
-    std::numeric_limits<int64_t>::max(),
-    "Epoch for the first LR decay");
-DEFINE_int64(
-    lr_decay_step,
-    std::numeric_limits<int64_t>::max(),
-    "Epochs for each new LR decay");
 DEFINE_double(maxgradnorm, 0, "Clip gradients at value (0 = no clipping)");
 DEFINE_double(adambeta1, 0.9, "beta1 in the Adam optimizer");
 DEFINE_double(adambeta2, 0.999, "beta2 in the Adam optimizer");
@@ -103,13 +86,13 @@ DEFINE_double(optimepsilon, 1e-8, "epsilon in the optimizer");
 // LR-SCHEDULER OPTIONS
 DEFINE_int64(
     stepsize,
-    std::numeric_limits<int64_t>::max(),
-    "We multiply LR by gamma every stepsize updates");
+    1000000,
+    "We multiply LR by gamma every stepsize epochs");
 DEFINE_double(gamma, 1.0, "the LR annealing multiplier");
 
 // OPTIMIZER OPTIONS
-DEFINE_string(netoptim, kSGDOptimizer, "optimizer for the network");
-DEFINE_string(critoptim, kSGDOptimizer, "optimizer for the criterion");
+DEFINE_string(netoptim, kSGDoptimizer, "optimizer for the network");
+DEFINE_string(critoptim, kSGDoptimizer, "optimizer for the criterion");
 
 // MFCC OPTIONS
 DEFINE_bool(mfcc, false, "use standard htk mfcc features as input");
@@ -128,16 +111,6 @@ DEFINE_int64(
     framestridems,
     10,
     "Stride millisecond for power spectrum feature");
-
-// SPECAUGMENT OPTIONS
-DEFINE_int64(saug_fmaskf, 27, "Max number of frequency bands that are masked");
-DEFINE_int64(saug_fmaskn, 2, "Number of frequency masks");
-DEFINE_int64(saug_tmaskt, 100, "Max number of timesteps that are masked");
-DEFINE_double(
-    saug_tmaskp,
-    1.0,
-    "Max proportion of the input sequence (1.0 is 100%) that can be masked in time");
-DEFINE_int64(saug_tmaskn, 2, "Number of time masks");
 
 // RUN OPTIONS
 DEFINE_string(datadir, "", "speech data directory");
@@ -171,24 +144,12 @@ DEFINE_string(arch, "default", "network architecture");
 DEFINE_string(criterion, kAsgCriterion, "training criterion");
 DEFINE_int64(encoderdim, 0, "Dimension of encoded hidden state.");
 
-// Seq2Seq Transformer decoder
-DEFINE_int64(
-    am_decoder_tr_layers,
-    1,
-    "s2s transformer decoder: number of layers");
-DEFINE_double(am_decoder_tr_dropout, 0.0, "s2s transformer decoder: dropout");
-DEFINE_double(
-    am_decoder_tr_layerdrop,
-    0.0,
-    "s2s transformer decoder: layerdrop");
-
 // DECODER OPTIONS
 
 DEFINE_bool(show, false, "show predictions");
 DEFINE_bool(showletters, false, "show letter predictions");
 DEFINE_bool(logadd, false, "use logadd when merging decoder nodes");
 DEFINE_bool(uselexicon, true, "use lexicon in decoding");
-DEFINE_bool(isbeamdump, false, "dump the decoding beam");
 
 DEFINE_string(smearing, "none", "none, max or logadd");
 DEFINE_string(lmtype, "kenlm", "kenlm, convlm");
@@ -201,27 +162,22 @@ DEFINE_string(sclite, "", "path/to/sclite to be written");
 DEFINE_string(decodertype, "wrd", "wrd, tkn");
 
 DEFINE_double(lmweight, 0.0, "language model weight");
-DEFINE_double(wordscore, 0.0, "word insertion score");
-DEFINE_double(silscore, 0.0, "silence insertion score");
+DEFINE_double(wordscore, 0.0, "wordscore");
+DEFINE_double(silweight, 0.0, "silence weight");
 DEFINE_double(
-    unkscore,
+    unkweight,
     -std::numeric_limits<float>::infinity(),
-    "unknown word insertion score");
-DEFINE_double(eosscore, 0.0, "EOS insertion score");
+    "unknown word weight");
 DEFINE_double(beamthreshold, 25, "beam score threshold");
 
 DEFINE_int32(maxload, -1, "max number of testing examples.");
 DEFINE_int32(maxword, -1, "maximum number of words to use");
-DEFINE_int32(beamsize, 2500, "max overall beam size");
-DEFINE_int32(beamsizetoken, 250000, "max beam for token selection");
-DEFINE_int32(nthread_decoder_am_forward, 1, "number of threads for AM forward");
+DEFINE_int32(beamsize, 2500, "max beam size");
 DEFINE_int32(nthread_decoder, 1, "number of threads for decoding");
 DEFINE_int32(
     lm_memory,
     5000,
     "total memory size for batch during forward pass ");
-
-DEFINE_int32(emission_queue_size, 3000, "max size of emission queue");
 
 DEFINE_double(
     smoothingtemperature,
@@ -229,11 +185,16 @@ DEFINE_double(
     "smoothening the probability distribution in seq2seq decoder");
 DEFINE_int32(
     attentionthreshold,
-    std::numeric_limits<int>::max(),
+    std::numeric_limits<int>::infinity(),
     "hard attention limit");
+DEFINE_double(hardselection, 1.0, "end-of-sentence threshold");
+DEFINE_double(
+    softselection,
+    std::numeric_limits<double>::infinity(),
+    "threshold to keep new candidate from being proposed");
 
 // ASG OPTIONS
-DEFINE_int64(linseg, 0, "# of updates of LinSeg to init transitions for ASG");
+DEFINE_int64(linseg, 0, "# of epochs of LinSeg to init transitions for ASG");
 DEFINE_double(linlr, -1.0, "LinSeg learning rate (if < 0, use lr)");
 DEFINE_double(
     linlrcrit,
@@ -267,7 +228,6 @@ DEFINE_int64(
     0,
     "Number of convolutional channels for location attention");
 DEFINE_int64(attnconvkernel, 0, "Kernel width for location attention");
-DEFINE_int64(numattnhead, 8, "number of heads for multihead attention");
 DEFINE_int64(leftWindowSize, 50, "left median window width");
 DEFINE_int64(rightWindowSize, 50, "right median window width");
 DEFINE_int64(
@@ -302,7 +262,7 @@ DEFINE_bool(trainWithWindow, false, "use window in training");
 DEFINE_int64(
     pretrainWindow,
     0,
-    "use window in training for pretrainWindow in updates");
+    "use window in training for pretrainWindow epochs");
 DEFINE_double(gumbeltemperature, 1.0, "temperature in gumbel softmax");
 DEFINE_int64(decoderrnnlayer, 1, "The number of decoder rnn layers.");
 DEFINE_int64(decoderattnround, 1, "The number of decoder attention rounds.");
@@ -318,10 +278,6 @@ DEFINE_int64(
     world_size,
     1,
     "total number of the process (Used if rndv_filepath is not empty)");
-DEFINE_int64(
-    max_devices_per_node,
-    8,
-    "the maximum number of devices per training node");
 DEFINE_string(
     rndv_filepath,
     "",
@@ -331,85 +287,5 @@ DEFINE_string(
 // FB SPECIFIC
 DEFINE_string(target, "tkn", "target feature");
 DEFINE_bool(everstoredb, false, "use Everstore db for reading data");
-DEFINE_bool(use_memcache, false, "use Memcache for reading data");
-
-namespace detail {
-
-/***************************** Deprecated Flags  *****************************/
-namespace {
-
-void registerDeprecatedFlags() {
-  // Register deprecated flags here using DEPRECATE_FLAGS. For example:
-  // DEPRECATE_FLAGS(my_now_deprecated_flag_name, my_new_flag_name);
-}
-
-} // namespace
-
-DeprecatedFlagsMap& getDeprecatedFlags() {
-  static DeprecatedFlagsMap flagsMap = DeprecatedFlagsMap();
-  return flagsMap;
-}
-
-void addDeprecatedFlag(
-    const std::string& deprecatedFlagName,
-    const std::string& newFlagName) {
-  auto& map = getDeprecatedFlags();
-  map.emplace(deprecatedFlagName, newFlagName);
-}
-
-bool isFlagSet(const std::string& name) {
-  gflags::CommandLineFlagInfo flagInfo;
-  if (!gflags::GetCommandLineFlagInfo(name.c_str(), &flagInfo)) {
-    std::stringstream ss;
-    ss << "Flag name " << name << " not found - check that it's declared.";
-    throw std::invalid_argument(ss.str());
-  }
-  return !flagInfo.is_default;
-}
-
-} // namespace detail
-
-void handleDeprecatedFlags() {
-  auto& map = detail::getDeprecatedFlags();
-  // Register flags
-  static std::once_flag registerFlagsOnceFlag;
-  std::call_once(registerFlagsOnceFlag, detail::registerDeprecatedFlags);
-
-  for (auto& flagPair : map) {
-    std::string deprecatedFlagValue;
-    gflags::GetCommandLineOption(flagPair.first.c_str(), &deprecatedFlagValue);
-
-    bool deprecatedFlagSet = detail::isFlagSet(flagPair.first);
-    bool newFlagSet = detail::isFlagSet(flagPair.second);
-
-    if (deprecatedFlagSet && newFlagSet) {
-      // Use the new flag value
-      std::cerr << "[WARNING] Both deprecated flag " << flagPair.first
-                << " and new flag " << flagPair.second
-                << " are set. Only the new flag will be "
-                << "serialized when the model saved." << std::endl;
-      ;
-    } else if (deprecatedFlagSet && !newFlagSet) {
-      std::cerr
-          << "[WARNING] Usage of flag --" << flagPair.first
-          << " is deprecated and has been replaced with "
-          << "--" << flagPair.second
-          << ". Setting the new flag equal to the value of the deprecated flag."
-          << "The old flag will not be serialized when the model is saved."
-          << std::endl;
-      if (gflags::SetCommandLineOption(
-              flagPair.second.c_str(), deprecatedFlagValue.c_str())
-              .empty()) {
-        std::stringstream ss;
-        ss << "Failed to set new flag " << flagPair.second << " to value from "
-           << flagPair.first << ".";
-        throw std::logic_error(ss.str());
-      }
-    }
-
-    // If the user set the new flag but not the deprecated flag, noop. If the
-    // user set neither flag, noop.
-  }
-}
 
 } // namespace w2l

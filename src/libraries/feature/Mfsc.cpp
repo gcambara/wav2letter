@@ -16,8 +16,9 @@
 
 namespace w2l {
 
-Mfsc::Mfsc(const FeatureParams& params)
-    : PowerSpectrum(params),
+template <typename T>
+Mfsc<T>::Mfsc(const FeatureParams& params)
+    : PowerSpectrum<T>(params),
       triFltBank_(
           params.numFilterbankChans,
           params.filterFreqResponseLen(),
@@ -29,23 +30,24 @@ Mfsc::Mfsc(const FeatureParams& params)
   validateMfscParams();
 }
 
-std::vector<float> Mfsc::apply(const std::vector<float>& input) {
+template <typename T>
+std::vector<T> Mfsc<T>::apply(const std::vector<T>& input) {
   auto frames = frameSignal(input, this->featParams_);
   if (frames.empty()) {
     return {};
   }
 
-  int nSamples = this->featParams_.numFrameSizeSamples();
-  int nFrames = frames.size() / nSamples;
+  int64_t nSamples = this->featParams_.numFrameSizeSamples();
+  int64_t nFrames = frames.size() / nSamples;
 
-  std::vector<float> energy(nFrames);
+  std::vector<T> energy(nFrames);
   if (this->featParams_.useEnergy && this->featParams_.rawEnergy) {
     for (size_t f = 0; f < nFrames; ++f) {
       auto begin = frames.data() + f * nSamples;
       energy[f] = std::log(std::max(
           std::inner_product(
-              begin, begin + nSamples, begin, static_cast<float>(0.0)),
-          std::numeric_limits<float>::lowest()));
+              begin, begin + nSamples, begin, static_cast<T>(0.0)),
+          std::numeric_limits<T>::min()));
     }
   }
   auto mfscFeat = mfscImpl(frames);
@@ -56,11 +58,11 @@ std::vector<float> Mfsc::apply(const std::vector<float>& input) {
         auto begin = frames.data() + f * nSamples;
         energy[f] = std::log(std::max(
             std::inner_product(
-                begin, begin + nSamples, begin, static_cast<float>(0.0)),
-            std::numeric_limits<float>::lowest()));
+                begin, begin + nSamples, begin, static_cast<T>(0.0)),
+            std::numeric_limits<T>::min()));
       }
     }
-    std::vector<float> newMfscFeat(mfscFeat.size() + nFrames);
+    std::vector<T> newMfscFeat(mfscFeat.size() + nFrames);
     for (size_t f = 0; f < nFrames; ++f) {
       size_t start = f * numFeat;
       newMfscFeat[start + f] = energy[f];
@@ -76,27 +78,29 @@ std::vector<float> Mfsc::apply(const std::vector<float>& input) {
   return derivatives_.apply(mfscFeat, numFeat);
 }
 
-std::vector<float> Mfsc::mfscImpl(std::vector<float>& frames) {
+template <typename T>
+std::vector<T> Mfsc<T>::mfscImpl(std::vector<T>& frames) {
   auto powspectrum = this->powSpectrumImpl(frames);
   if (this->featParams_.usePower) {
     std::transform(
-        powspectrum.begin(),
-        powspectrum.end(),
-        powspectrum.begin(),
-        [](float x) { return x * x; });
+        powspectrum.begin(), powspectrum.end(), powspectrum.begin(), [](T x) {
+          return x * x;
+        });
   }
   auto triflt = triFltBank_.apply(powspectrum, this->featParams_.melFloor);
-  std::transform(triflt.begin(), triflt.end(), triflt.begin(), [](float x) {
+  std::transform(triflt.begin(), triflt.end(), triflt.begin(), [](T x) {
     return std::log(x);
   });
   return triflt;
 }
 
-int Mfsc::outputSize(int inputSz) {
+template <typename T>
+int64_t Mfsc<T>::outputSize(int64_t inputSz) {
   return this->featParams_.mfscFeatSz() * this->featParams_.numFrames(inputSz);
 }
 
-void Mfsc::validateMfscParams() const {
+template <typename T>
+void Mfsc<T>::validateMfscParams() const {
   this->validatePowSpecParams();
   if (this->featParams_.numFilterbankChans <= 0) {
     throw std::invalid_argument("Mfsc: numFilterbankChans must be positive");
@@ -104,4 +108,7 @@ void Mfsc::validateMfscParams() const {
     throw std::invalid_argument("Mfsc: melfloor must be positive");
   }
 }
+
+template class Mfsc<float>;
+template class Mfsc<double>;
 } // namespace w2l

@@ -16,7 +16,6 @@ namespace w2l {
 void initDistributed(
     int worldRank,
     int worldSize,
-    int maxDevicesPerNode,
     const std::string& rndvFilepath) {
   if (rndvFilepath.empty()) {
     distributedInit(
@@ -24,14 +23,14 @@ void initDistributed(
         -1, // unused for MPI
         -1, // unused for MPI
         {{fl::DistributedConstants::kMaxDevicePerNode,
-          std::to_string(maxDevicesPerNode)}});
+          std::to_string(kMaxDevicePerNode)}});
   } else {
     distributedInit(
         fl::DistributedInit::FILE_SYSTEM,
         worldRank,
         worldSize,
         {{fl::DistributedConstants::kMaxDevicePerNode,
-          std::to_string(maxDevicesPerNode)},
+          std::to_string(kMaxDevicePerNode)},
          {fl::DistributedConstants::kFilePath, rndvFilepath}});
   }
 }

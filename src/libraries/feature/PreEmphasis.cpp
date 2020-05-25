@@ -13,7 +13,8 @@
 
 namespace w2l {
 
-PreEmphasis::PreEmphasis(float alpha, int N)
+template <typename T>
+PreEmphasis<T>::PreEmphasis(T alpha, int64_t N)
     : preemCoef_(alpha), windowLength_(N) {
   if (windowLength_ <= 1) {
     throw std::invalid_argument("PreEmphasis: windowLength must be > 1");
@@ -23,13 +24,15 @@ PreEmphasis::PreEmphasis(float alpha, int N)
   }
 };
 
-std::vector<float> PreEmphasis::apply(const std::vector<float>& input) const {
+template <typename T>
+std::vector<T> PreEmphasis<T>::apply(const std::vector<T>& input) const {
   auto output(input);
   applyInPlace(output);
   return output;
 }
 
-void PreEmphasis::applyInPlace(std::vector<float>& input) const {
+template <typename T>
+void PreEmphasis<T>::applyInPlace(std::vector<T>& input) const {
   if (input.size() % windowLength_ != 0) {
     throw std::invalid_argument(
         "PreEmphasis: input.size() not divisible by windowLength");
@@ -44,4 +47,7 @@ void PreEmphasis::applyInPlace(std::vector<float>& input) const {
     input[s] *= (1 - preemCoef_);
   }
 }
+
+template class PreEmphasis<float>;
+template class PreEmphasis<double>;
 } // namespace w2l

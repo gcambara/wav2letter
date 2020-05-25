@@ -35,18 +35,6 @@ std::shared_ptr<AttentionBase> buildAttention() {
         FLAGS_attndim,
         FLAGS_attnconvchannel,
         FLAGS_attnconvkernel);
-  } else if (FLAGS_attention == w2l::kMultiHeadContentAttention) {
-    attention = std::make_shared<MultiHeadContentAttention>(
-        FLAGS_encoderdim, FLAGS_numattnhead);
-  } else if (FLAGS_attention == w2l::kMultiHeadKeyValueContentAttention) {
-    attention = std::make_shared<MultiHeadContentAttention>(
-        FLAGS_encoderdim, FLAGS_numattnhead, true);
-  } else if (FLAGS_attention == w2l::kMultiHeadSplitContentAttention) {
-    attention = std::make_shared<MultiHeadContentAttention>(
-        FLAGS_encoderdim, FLAGS_numattnhead, false, true);
-  } else if (FLAGS_attention == w2l::kMultiHeadKeyValueSplitContentAttention) {
-    attention = std::make_shared<MultiHeadContentAttention>(
-        FLAGS_encoderdim, FLAGS_numattnhead, true, true);
   } else {
     throw std::runtime_error("Unimplmented attention: " + FLAGS_attention);
   }
@@ -494,8 +482,8 @@ std::pair<Variable, Seq2SeqState> Seq2SeqCriterion::decodeStep(
     const Variable& xEncoded,
     const Variable& y,
     const Seq2SeqState& inState) const {
-  size_t stepSize = fl::afGetMemStepSize();
-  fl::afSetMemStepSize(10 * (1 << 10));
+  size_t stepSize = af::getMemStepSize();
+  af::setMemStepSize(10 * (1 << 10));
   Variable hy;
   if (y.isempty()) {
     hy = tile(startEmbedding(), {1, 1, static_cast<int>(xEncoded.dims(2))});
@@ -532,7 +520,7 @@ std::pair<Variable, Seq2SeqState> Seq2SeqCriterion::decodeStep(
   outState.summary = summaries;
 
   auto out = linearOut()->forward(hy); // C x 1 x B
-  fl::afSetMemStepSize(stepSize);
+  af::setMemStepSize(stepSize);
   return std::make_pair(out, outState);
 }
 
@@ -544,8 +532,8 @@ Seq2SeqCriterion::decodeBatchStep(
     const int attentionThreshold,
     const float smoothingTemperature) const {
   // NB: xEncoded has to be with batchsize 1
-  size_t stepSize = fl::afGetMemStepSize();
-  fl::afSetMemStepSize(10 * (1 << 10));
+  size_t stepSize = af::getMemStepSize();
+  af::setMemStepSize(10 * (1 << 10));
   int batchSize = ys.size();
   std::vector<Variable> statesVector(batchSize);
 
@@ -579,7 +567,7 @@ Seq2SeqCriterion::decodeBatchStep(
       for (int i = 0; i < batchSize; i++) {
         statesVector[i] = inStates[i]->hidden[n];
       }
-      Variable inStateHiddenBatched = concatenate(statesVector, 1).linear();
+      Variable inStateHiddenBatched = concatenate(statesVector, 1);
       std::tie(yBatched, outStateBatched) =
           decodeRNN(n)->forward(yBatched, inStateHiddenBatched);
     }
@@ -625,7 +613,7 @@ Seq2SeqCriterion::decodeBatchStep(
     out[i] = w2l::afToVector<float>(outBatched.col(i));
   }
 
-  fl::afSetMemStepSize(stepSize);
+  af::setMemStepSize(stepSize);
   return std::make_pair(out, outstates);
 }
 

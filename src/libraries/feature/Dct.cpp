@@ -16,7 +16,8 @@
 
 namespace w2l {
 
-Dct::Dct(int numfilters, int numceps)
+template <typename T>
+Dct<T>::Dct(int64_t numfilters, int64_t numceps)
     : numFilters_(numfilters),
       numCeps_(numceps),
       dctMat_(numfilters * numceps) {
@@ -28,7 +29,11 @@ Dct::Dct(int numfilters, int numceps)
   }
 }
 
-std::vector<float> Dct::apply(const std::vector<float>& input) const {
+template <typename T>
+std::vector<T> Dct<T>::apply(const std::vector<T>& input) const {
   return cblasGemm(input, dctMat_, numCeps_, numFilters_);
 }
+
+template class Dct<float>;
+template class Dct<double>;
 } // namespace w2l

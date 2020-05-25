@@ -50,7 +50,8 @@ namespace w2l {
 //      https://www.mathworks.com/matlabcentral/fileexchange/32849-htk-mfcc-matlab
 //
 
-class Mfcc : public Mfsc {
+template <typename T>
+class Mfcc : public Mfsc<T> {
  public:
   explicit Mfcc(const FeatureParams& params);
 
@@ -58,15 +59,15 @@ class Mfcc : public Mfsc {
 
   // input - input speech signal (T)
   // Returns - MFCC features (Col Major : FEAT X FRAMESZ)
-  std::vector<float> apply(const std::vector<float>& input) override;
+  std::vector<T> apply(const std::vector<T>& input) override;
 
-  int outputSize(int inputSz) override;
+  int64_t outputSize(int64_t inputSz) override;
 
  private:
   // The following classes are defined in the order they are applied
-  Dct dct_;
-  Ceplifter ceplifter_;
-  Derivatives derivatives_;
+  Dct<T> dct_;
+  Ceplifter<T> ceplifter_;
+  Derivatives<T> derivatives_;
 
   void validateMfccParams() const;
 };

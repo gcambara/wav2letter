@@ -14,8 +14,8 @@
 #include <stdexcept>
 
 namespace w2l {
-
-Windowing::Windowing(int N, WindowType windowtype)
+template <typename T>
+Windowing<T>::Windowing(int64_t N, WindowType windowtype)
     : windowLength_(N), windowType_(windowtype), coefs_(N) {
   if (windowLength_ <= 1) {
     throw std::invalid_argument("Windowing: windowLength must be > 1");
@@ -37,13 +37,15 @@ Windowing::Windowing(int N, WindowType windowtype)
   }
 }
 
-std::vector<float> Windowing::apply(const std::vector<float>& input) const {
+template <typename T>
+std::vector<T> Windowing<T>::apply(const std::vector<T>& input) const {
   auto output(input);
   applyInPlace(output);
   return output;
 }
 
-void Windowing::applyInPlace(std::vector<float>& input) const {
+template <typename T>
+void Windowing<T>::applyInPlace(std::vector<T>& input) const {
   if (input.size() % windowLength_ != 0) {
     throw std::invalid_argument(
         "Windowing: input size is not divisible by windowLength");
@@ -56,4 +58,7 @@ void Windowing::applyInPlace(std::vector<float>& input) const {
     }
   }
 }
+
+template class Windowing<float>;
+template class Windowing<double>;
 } // namespace w2l

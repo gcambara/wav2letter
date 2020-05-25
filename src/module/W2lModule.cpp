@@ -110,35 +110,6 @@ std::shared_ptr<Module> parseLines(
     return std::make_shared<Padding>(pad0, pad1, pad2, pad3, val);
   }
 
-  /* ========== TRANSFORMERS ========== */
-
-  if (params[0] == "TR") {
-    int modelDim = std::stoi(params[1]);
-    int mlpDim = std::stoi(params[2]);
-    int nHead = std::stoi(params[3]);
-    int csz = std::stoi(params[4]);
-    float pDropout = std::stof(params[5]);
-    float pLayerdrop = (params.size() >= 7) ? std::stof(params[6]) : 0.0;
-    int preLN = (params.size() >= 8) ? std::stoi(params[7]) : 0;
-    return std::make_shared<Transformer>(
-        modelDim,
-        modelDim / nHead,
-        mlpDim,
-        nHead,
-        csz,
-        pDropout,
-        pLayerdrop,
-        false,
-        preLN);
-  }
-
-  if (params[0] == "POSEMB") {
-    int layerDim = std::stoi(params[1]);
-    int csz = std::stoi(params[2]);
-    float dropout = (params.size() >= 4) ? std::stof(params[3]) : 0.0;
-    return std::make_shared<PositionEmbedding>(layerDim, csz, dropout);
-  }
-
   /* ========== CONVOLUTIONS ========== */
 
   if (params[0] == "C" || params[0] == "C1") {
@@ -153,17 +124,13 @@ std::shared_ptr<Module> parseLines(
   }
 
   if (params[0] == "TDS") {
-    LOG_IF(FATAL, !inRange(4, params.size(), 8)) << "Failed parsing - " << line;
+    LOG_IF(FATAL, !inRange(4, params.size(), 6)) << "Failed parsing - " << line;
     int cisz = std::stoi(params[1]);
     int cwx = std::stoi(params[2]);
     int freqdim = std::stoi(params[3]);
     double dropprob = (params.size() >= 5 ? std::stod(params[4]) : 0);
     int l2 = (params.size() >= 6 ? std::stoi(params[5]) : 0);
-    int rPad = (params.size() >= 7) ? std::stoi(params[6]) : -1;
-    bool lNormIncludeTime =
-        (params.size() >= 8 && std::stoi(params[7]) == 0) ? false : true;
-    return std::make_shared<w2l::TDSBlock>(
-        cisz, cwx, freqdim, dropprob, l2, rPad, lNormIncludeTime);
+    return std::make_shared<w2l::TDSBlock>(cisz, cwx, freqdim, dropprob, l2);
   }
 
   if (params[0] == "AC") {
@@ -232,13 +199,6 @@ std::shared_ptr<Module> parseLines(
     std::vector<int> featDims;
     for (int i = 1; i < params.size(); ++i) {
       featDims.emplace_back(std::stoi(params[i]));
-    }
-    if (featDims == std::vector<int>{3}) {
-      LOG(FATAL)
-          << "flashlight LayerNorm API for specifying `featAxes` is modified "
-          << "recently - https://git.io/Je70U. You probably would want to "
-          << "specify LN 0 1 2 instead of LN 3. If you really know what you're "
-          << "doing, comment out this check and build again.";
     }
     return std::make_shared<LayerNorm>(featDims);
   }

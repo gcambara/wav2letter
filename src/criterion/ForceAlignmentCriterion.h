@@ -24,8 +24,6 @@ class ForceAlignmentCriterion : public fl::BinaryModule {
   fl::Variable forward(const fl::Variable& input, const fl::Variable& target)
       override;
 
-  af::array viterbiPath(const af::array& input, const af::array& target);
-
   std::string prettyString() const override;
 
  private:

@@ -12,7 +12,7 @@ if (FLASHLIGHT_USE_CUDA)
   # Build WarpCTC
   set(WARPCTC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/warpctc)
   message(STATUS "Adding warpctc:")
-  add_subdirectory(${WARPCTC_DIR} ${PROJECT_BINARY_DIR}/src/third_party/warpctc)
+  add_subdirectory(${WARPCTC_DIR} ${WARPCTC_DIR}/build)
   set(WARPCTC_INCLUDE_DIR ${WARPCTC_DIR}/include)
 
   target_sources(
@@ -29,8 +29,6 @@ if (FLASHLIGHT_USE_CUDA)
     INTERFACE
     ${CUDA_LIBRARIES}
     warpctc # added directly from subdir
-    # Can remove once CTC constrained Viterbi is implemented in CUDA T62268085
-    criterion-library
     )
 
   target_include_directories(
@@ -67,7 +65,6 @@ target_sources(
   ${CMAKE_CURRENT_SOURCE_DIR}/ForceAlignmentCriterion.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Seq2SeqCriterion.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FullConnectionCriterion.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/TransformerCriterion.cpp
   )
 
 target_link_libraries(
@@ -101,7 +98,6 @@ target_sources(
   INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/attention/ContentAttention.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/attention/LocationAttention.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/attention/MultiHeadAttention.cpp
   )
 
 target_include_directories(

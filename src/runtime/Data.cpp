@@ -40,8 +40,7 @@ std::shared_ptr<W2lDataset> createDataset(
         worldSize,
         fallback2Ltr,
         skipUnk,
-        FLAGS_datadir,
-        FLAGS_use_memcache);
+        FLAGS_datadir);
 #else
     LOG(FATAL) << "W2lEverstoreDataset not supported: "
                << "build with -DW2L_BUILD_FB_DEPENDENCIES";

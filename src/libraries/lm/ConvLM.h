@@ -19,7 +19,7 @@ namespace w2l {
 using GetConvLmScoreFunc = std::function<std::vector<std::vector<
     float>>(const std::vector<int>&, const std::vector<int>&, int, int)>;
 
-struct ConvLMState : LMState {
+struct ConvLMState {
   std::vector<int> tokens;
   int length;
 
@@ -46,6 +46,9 @@ class ConvLM : public LM {
 
   std::pair<LMStatePtr, float> finish(const LMStatePtr& state) override;
 
+  int compareState(const LMStatePtr& state1, const LMStatePtr& state2)
+      const override;
+
   void updateCache(std::vector<LMStatePtr> states) override;
 
  private:
@@ -62,6 +65,8 @@ class ConvLM : public LM {
 
   int vocabSize_;
   int maxHistorySize_;
+
+  static ConvLMState* getRawState(const LMStatePtr& state);
 
   std::pair<LMStatePtr, float> scoreWithLmIdx(
       const LMStatePtr& state,
